@@ -32,12 +32,22 @@ export interface AttackConfig {
 }
 
 /**
+ * ARP spoofing state
+ */
+export interface ArpSpoofState {
+  targetIp: string;
+  gatewayIp: string;
+  active: boolean;
+}
+
+/**
  * Attack rules for cleanup
  */
 export interface AttackRules {
   tc: string[];
   iptables: string[];
   netem: string[];
+  arp?: ArpSpoofState;
 }
 
 /**

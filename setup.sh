@@ -1,8 +1,9 @@
-# NetherRipper v2.0 - Quick Setup Script
+#!/bin/bash
+# NetherRipper v2.1 - Quick Setup Script
 
 set -e
 
-echo "🔥 NetherRipper v2.0 - Setup"
+echo "🔥 NetherRipper v2.1 - Setup"
 echo "=============================="
 echo ""
 
@@ -39,11 +40,19 @@ if ! command -v iptables &> /dev/null; then
     MISSING+=("iptables")
 fi
 
+if ! command -v arp &> /dev/null; then
+    MISSING+=("net-tools")
+fi
+
+if ! command -v arping &> /dev/null; then
+    MISSING+=("iputils-arping")
+fi
+
 if [ ${#MISSING[@]} -ne 0 ]; then
     echo "❌ Missing dependencies: ${MISSING[*]}"
     echo ""
     echo "Install with:"
-    echo "  sudo apt install iproute2 iptables"
+    echo "  sudo apt install iproute2 iptables net-tools iputils-arping"
     exit 1
 fi
 
@@ -92,14 +101,19 @@ echo "=============================="
 echo "🎉 Setup complete!"
 echo "=============================="
 echo ""
+echo "⚠️  IMPORTANT v2.1 UPDATE:"
+echo "   This version includes ARP SPOOFING!"
+echo "   Tool will now ACTUALLY WORK and KILL targets"
+echo ""
 echo "Usage:"
 echo "  1. Set consent: export NETHER_CONSENT=yes"
-echo "  2. Scan network: sudo ./nr scan"
-echo "  3. Kill target:  sudo ./nr kill <IP>"
-echo "  4. Stop attack:  sudo ./nr stop"
+echo "  2. Scan network: sudo -E ./nr scan"
+echo "  3. Kill target:  sudo -E ./nr kill <IP>"
+echo "  4. Stop attack:  sudo -E ./nr stop"
 echo ""
 echo "Optional: Install globally"
 echo "  sudo cp ./nr /usr/local/bin/"
 echo ""
 echo "⚠️  WARNING: Use responsibly and legally!"
+echo "⚠️  ARP spoofing is now active - targets WILL be disconnected!"
 echo ""

@@ -72,14 +72,14 @@ export async function scanNetwork(networkInfo: NetworkInfo): Promise<NetworkDevi
   const devices: NetworkDevice[] = [];
 
   try {
-    // Try arp-scan first (faster)
-    const { stdout, success } = await exec(
-      `arp-scan --interface=${iface} --localnet --retry=1 --timeout=500 2>/dev/null`,
+    // Try arp-scan first (faster and more reliable)
+    const { stdout: arpScanOut, success: arpSuccess } = await exec(
+      `arp-scan --interface=${iface} --localnet --retry=2 --timeout=1000 2>&1 | grep -E '^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+'`,
       { ignoreError: true }
     );
 
-    if (success && stdout) {
-      const lines = stdout.trim().split('\n');
+    if (arpSuccess && arpScanOut) {
+      const lines = arpScanOut.trim().split('\n');
       
       for (const line of lines) {
         // Parse arp-scan output: IP MAC Vendor
@@ -99,35 +99,80 @@ export async function scanNetwork(networkInfo: NetworkInfo): Promise<NetworkDevi
       }
     }
 
-    // Fallback to nmap if arp-scan not available
+    // Fallback to nmap if arp-scan not available or failed
     if (devices.length === 0) {
-      const { stdout: nmapOut } = await exec(
-        `nmap -sn ${networkAddress}/${subnet} -T5 --max-retries 1 --host-timeout 500ms 2>/dev/null | grep 'Nmap scan report'`
+      console.log('  arp-scan unavailable, using nmap...');
+      
+      // First do a ping sweep to find active hosts
+      const { stdout: nmapOut, success: nmapSuccess } = await exec(
+        `nmap -sn ${networkAddress}/${subnet} -T5 --max-retries 1 --host-timeout 500ms 2>&1`,
+        { ignoreError: true }
       );
 
-      const ipMatches = nmapOut.matchAll(/Nmap scan report for .*?(\d+\.\d+\.\d+\.\d+)/g);
+      if (nmapSuccess && nmapOut) {
+        // Extract IPs from nmap output
+        const lines = nmapOut.split('\n');
+        const foundIps: string[] = [];
+        
+        for (const line of lines) {
+          const match = line.match(/Nmap scan report for (?:.*\s)?(\d+\.\d+\.\d+\.\d+)/);
+          if (match && match[1]) {
+            foundIps.push(match[1]);
+          }
+        }
+
+        // Get MAC from ARP table for each IP
+        for (const ip of foundIps) {
+          const { stdout: arpOut } = await exec(
+            `ip neigh show ${ip} | awk '{print $5}'`,
+            { ignoreError: true }
+          );
+          const mac = arpOut.trim() || 'Unknown';
+
+          devices.push({
+            ip,
+            mac,
+            vendor: 'Unknown',
+            isGateway: ip === gateway,
+            isOwn: ip === ownIp,
+          });
+        }
+      }
+    }
+
+    // Fallback to ARP table scan if both failed
+    if (devices.length === 0) {
+      console.log('  Using ARP table scan...');
       
-      for (const match of ipMatches) {
-        const ip = match[1];
-        if (!ip) continue;
+      const { stdout: arpTable } = await exec(
+        `ip neigh show | grep -v FAILED | awk '{print $1,$5}'`,
+        { ignoreError: true }
+      );
 
-        // Get MAC from ARP table
-        const { stdout: arpOut } = await exec(`arp -n ${ip} | grep ${ip} | awk '{print $3}'`);
-        const mac = arpOut.trim() || 'Unknown';
-
-        devices.push({
-          ip,
-          mac,
-          vendor: 'Unknown',
-          isGateway: ip === gateway,
-          isOwn: ip === ownIp,
-        });
+      const lines = arpTable.trim().split('\n');
+      for (const line of lines) {
+        const parts = line.split(/\s+/);
+        if (parts.length >= 2 && parts[0]?.match(/^\d+\.\d+\.\d+\.\d+$/)) {
+          const ip = parts[0];
+          const mac = parts[1] || 'Unknown';
+          
+          devices.push({
+            ip,
+            mac,
+            vendor: 'Unknown',
+            isGateway: ip === gateway,
+            isOwn: ip === ownIp,
+          });
+        }
       }
     }
 
     // Always add gateway if not found
     if (gateway && !devices.some(d => d.ip === gateway)) {
-      const { stdout: gwMac } = await exec(`arp -n ${gateway} | grep ${gateway} | awk '{print $3}'`);
+      const { stdout: gwMac } = await exec(
+        `ip neigh show ${gateway} | awk '{print $5}'`,
+        { ignoreError: true }
+      );
       
       devices.unshift({
         ip: gateway,
@@ -135,6 +180,17 @@ export async function scanNetwork(networkInfo: NetworkInfo): Promise<NetworkDevi
         vendor: 'Gateway',
         isGateway: true,
         isOwn: false,
+      });
+    }
+
+    // Always add own IP if not found
+    if (ownIp && !devices.some(d => d.ip === ownIp)) {
+      devices.push({
+        ip: ownIp,
+        mac: networkInfo.mac,
+        vendor: 'You',
+        isGateway: false,
+        isOwn: true,
       });
     }
 

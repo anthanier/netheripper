@@ -89,7 +89,7 @@ export function requireRoot(): void {
  * Check system dependencies
  */
 export async function checkDependencies(): Promise<string[]> {
-  const required = ['ip', 'tc', 'iptables', 'sysctl'];
+  const required = ['ip', 'tc', 'iptables', 'sysctl', 'arp', 'arping'];
   const missing: string[] = [];
 
   for (const cmd of required) {
@@ -107,9 +107,11 @@ export async function checkDependencies(): Promise<string[]> {
 export async function checkOptionalTools(): Promise<{
   arpScan: boolean;
   nmap: boolean;
+  arping: boolean;
 }> {
   return {
     arpScan: await commandExists('arp-scan'),
     nmap: await commandExists('nmap'),
+    arping: await commandExists('arping'),
   };
 }
