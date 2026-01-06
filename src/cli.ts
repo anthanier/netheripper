@@ -15,11 +15,9 @@ import {
 } from './core/killer';
 import {
   loadState,
-  saveState,
   addTarget,
   clearState,
   formatState,
-  getTargets
 } from './core/state';
 import { 
   requireRoot, 
@@ -142,7 +140,7 @@ async function cmdKill(targetIp: string): Promise<void> {
   console.log(chalk.red.bold('\n╔════════════════════════════════════════════════╗'));
   console.log(chalk.red.bold('║  ⚠️  EXTREME NETWORK ATTACK                    ') + chalk.red.bold('║'));
   console.log(chalk.red.bold('║                                                ') + chalk.red.bold('║'));
-  console.log(chalk.red.bold(`║  Target: ${targetIp.padEnd(39)}') + chalk.red.bold('║'));
+  console.log(chalk.red.bold(`║  Target: ${targetIp.padEnd(39)}`) + chalk.red.bold('║'));
   console.log(chalk.red.bold('║  This WILL destroy their connection!           ') + chalk.red.bold('║'));
   console.log(chalk.red.bold('║                                                ') + chalk.red.bold('║'));
   console.log(chalk.red.bold('║  Press Ctrl+C to abort (3s)...                 ') + chalk.red.bold('║'));
@@ -180,7 +178,7 @@ async function cmdKill(targetIp: string): Promise<void> {
   console.log(chalk.green('✓ Latency injected (5000ms)'));
 
   console.log(chalk.red.bold(`\n💀 Target ${targetIp} is now DEAD\n`));
-  console.log(chalk.yellow(`Run '${chalk.white('sudo nr stop')}' to restore\n`));
+  console.log(chalk.yellow(`Run ${chalk.white('\'sudo nr stop\'')} to restore\n`));
 
   // Monitor target
   console.log(chalk.gray('Monitoring target (Ctrl+C to stop)...\n'));
@@ -200,7 +198,7 @@ async function cmdKill(targetIp: string): Promise<void> {
     if (iterations >= 10) {
       clearInterval(interval);
       console.log(chalk.yellow('\nMonitoring stopped. Attack still active.'));
-      console.log(chalk.gray(`Run 'sudo nr stop' to cleanup\n`));
+      console.log(chalk.gray('Run \'sudo nr stop\' to cleanup\n'));
     }
   }, 5000);
 }
