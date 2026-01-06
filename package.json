@@ -1,0 +1,40 @@
+{
+  "name": "netheripper",
+  "version": "2.0.0",
+  "description": "Extreme Network Attack Tool - Bandwidth Destroyer",
+  "main": "dist/cli.js",
+  "type": "module",
+  "bin": {
+    "nr": "./dist/cli.js",
+    "netheripper": "./dist/cli.js"
+  },
+  "scripts": {
+    "dev": "bun --watch src/cli.ts",
+    "build": "bun build src/cli.ts --outdir dist --target bun --minify",
+    "build:exe": "bun build src/cli.ts --compile --outfile nr --minify",
+    "start": "bun run src/cli.ts",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist nr node_modules"
+  },
+  "keywords": [
+    "network-security",
+    "bandwidth-limiter",
+    "network-attack",
+    "ethical-hacking",
+    "penetration-testing"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "engines": {
+    "bun": ">=1.0.0"
+  },
+  "os": ["linux"],
+  "dependencies": {
+    "chalk": "^5.6.2"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.5",
+    "@types/node": "^25.0.3",
+    "typescript": "^5.9.3"
+  }
+}
