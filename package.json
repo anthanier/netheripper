@@ -23,7 +23,7 @@
     "ethical-hacking",
     "penetration-testing"
   ],
-  "author": "Your Name",
+  "author": "John Anthanier",
   "license": "MIT",
   "engines": {
     "bun": ">=1.0.0"

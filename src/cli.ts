@@ -1,13 +1,13 @@
 import chalk from 'chalk';
-import { 
-  getActiveInterface, 
-  getNetworkInfo, 
-  scanNetwork, 
-  isTargetOnline 
+import {
+  getActiveInterface,
+  getNetworkInfo,
+  scanNetwork,
+  isTargetOnline
 } from './core/scanner';
-import { 
-  killTarget, 
-  stopAttack, 
+import {
+  killTarget,
+  stopAttack,
   validateTarget,
   checkIpForwarding,
   enableIpForwarding,
@@ -33,23 +33,52 @@ import {
   clearState,
   formatState,
 } from './core/state';
-import { 
-  requireRoot, 
+import {
+  requireRoot,
   checkDependencies,
-  checkOptionalTools 
+  checkOptionalTools
 } from './core/exec';
 
 /**
  * Show banner
  */
 function showBanner(): void {
-  console.log(chalk.red.bold('\n╔════════════════════════════════════════════════╗'));
-  console.log(chalk.red.bold('║') + chalk.yellow.bold('  🔥 NETHERIPPER v2.1 - Network Destroyer  🔥  ') + chalk.red.bold('║'));
-  console.log(chalk.red.bold('╠════════════════════════════════════════════════╣'));
-  console.log(chalk.red.bold('║  ⚠️  WARNING: EXTREME NETWORK ATTACK TOOL      ') + chalk.red.bold('║'));
-  console.log(chalk.red.bold('║  🔒 Educational & Authorized Testing ONLY     ') + chalk.red.bold('║'));
-  console.log(chalk.red.bold('║  ⚖️  Unauthorized use is ILLEGAL              ') + chalk.red.bold('║'));
-  console.log(chalk.red.bold('╚════════════════════════════════════════════════╝\n'));
+  console.clear();
+
+  // Matrix rain effect (static)
+  console.log(chalk.green.dim('  01001110 01000101 01010100 01001000 01000101 01010010'));
+  console.log(chalk.green.dim('  01010010 01001001 01010000 01010000 01000101 01010010\n'));
+
+  console.log(chalk.red.bold(`
+███╗   ██╗███████╗████████╗██╗  ██╗███████╗██████╗ 
+████╗  ██║██╔════╝╚══██╔══╝██║  ██║██╔════╝██╔══██╗
+██╔██╗ ██║█████╗     ██║   ███████║█████╗  ██████╔╝
+██║╚██╗██║██╔══╝     ██║   ██╔══██║██╔══╝  ██╔══██╗
+██║ ╚████║███████╗   ██║   ██║  ██║███████╗██║  ██║
+╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝
+`));
+
+  console.log(chalk.red.bold(`
+██████╗ ██╗██████╗ ██████╗ ███████╗██████╗ 
+██╔══██╗██║██╔══██╗██╔══██╗██╔════╝██╔══██╗
+██████╔╝██║██████╔╝██████╔╝█████╗  ██████╔╝
+██╔══██╗██║██╔═══╝ ██╔═══╝ ██╔══╝  ██╔══██╗
+██║  ██║██║██║     ██║     ███████╗██║  ██║
+╚═╝  ╚═╝╚═╝╚═╝     ╚═╝     ╚══════╝╚═╝  ╚═╝
+`));
+
+  console.log(chalk.white.bold('                    [ NETWORK ANNIHILATION SYSTEM ]'));
+  console.log(chalk.cyan('                          » VERSION 1.0 «\n'));
+
+  console.log(chalk.red.bold('  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓'));
+  console.log(chalk.red.bold('  ┃') + chalk.yellow.bold('  ⚡ EXTREME NETWORK ATTACK FRAMEWORK              ⚡  ') + chalk.red.bold('┃'));
+  console.log(chalk.red.bold('  ┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫'));
+  console.log(chalk.red.bold('  ┃') + chalk.white('  [!] CLASSIFIED - UNAUTHORIZED ACCESS PROHIBITED     ') + chalk.red.bold('┃'));
+  console.log(chalk.red.bold('  ┃') + chalk.gray('      This system is monitored for security.          ') + chalk.red.bold('┃'));
+  console.log(chalk.red.bold('  ┃') + chalk.gray('      All activities are logged and traced.           ') + chalk.red.bold('┃'));
+  console.log(chalk.red.bold('  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n'));
+
+  console.log(chalk.green.dim('  11010101 10101010 01010101 10101010 11010101 10101010\n'));
 }
 
 /**
@@ -73,7 +102,7 @@ function showHelp(): void {
   console.log(chalk.red('  sudo nr nuke                    # KILL EVERYTHING!'));
   console.log(chalk.red('  sudo nr flood                   # FLOOD GATEWAY - TOTAL DESTRUCTION'));
   console.log(chalk.gray('  sudo nr stop\n'));
-  console.log(chalk.dim('GitHub: https://github.com/yourusername/netheripper\n'));
+  console.log(chalk.dim('GitHub: https://github.com/anthanier/netheripper\n'));
 }
 
 /**
@@ -120,7 +149,7 @@ async function cmdScan(): Promise<void> {
     const ip = device.ip.padEnd(15);
     const mac = device.mac.padEnd(17);
     let info = device.vendor || 'Unknown';
-    
+
     if (device.isGateway) {
       info = chalk.blue('[Gateway]');
     } else if (device.isOwn) {
@@ -148,7 +177,7 @@ async function cmdKill(targetIp: string): Promise<void> {
   // Check if target is online
   console.log(chalk.gray(`Checking if ${targetIp} is online...`));
   const isOnline = await isTargetOnline(targetIp);
-  
+
   if (!isOnline) {
     console.log(chalk.yellow(`\n⚠️  Warning: Target ${targetIp} appears offline`));
     console.log(chalk.gray('Continuing anyway...\n'));
@@ -201,12 +230,12 @@ async function cmdKill(targetIp: string): Promise<void> {
 
   // Monitor target
   console.log(chalk.gray('Monitoring target (Ctrl+C to stop)...\n'));
-  
+
   let iterations = 0;
   const interval = setInterval(async () => {
     iterations++;
     const status = await monitorTarget(targetIp);
-    
+
     if (status.alive) {
       console.log(chalk.gray(`[${new Date().toISOString()}] Target alive - Latency: ${status.latency?.toFixed(0)}ms`));
     } else {
@@ -268,7 +297,7 @@ async function cmdNuke(): Promise<void> {
   for (const device of targets) {
     try {
       console.log(chalk.gray(`Attacking ${device.ip} (${device.mac})...`));
-      
+
       const rules = await killTarget({
         targetIp: device.ip,
         interface: iface,
@@ -354,19 +383,19 @@ async function cmdFlood(): Promise<void> {
     console.log(chalk.green(`✓ Attack ID: ${attackId}`));
     console.log(chalk.green(`✓ Target: ${gatewayIp} (${ssid})`));
     console.log(chalk.green(`✓ Status: RUNNING IN BACKGROUND\n`));
-    
+
     console.log(chalk.yellow('🔥 Attack will continue even if you:'));
     console.log(chalk.gray('   - Disconnect from this WiFi'));
     console.log(chalk.gray('   - Connect to another WiFi'));
     console.log(chalk.gray('   - Close this terminal'));
     console.log(chalk.gray('   - Restart your laptop\n'));
-    
+
     console.log(chalk.cyan('💡 To attack multiple WiFi networks:'));
     console.log(chalk.gray('   1. Leave this attack running'));
     console.log(chalk.gray('   2. Connect to another WiFi'));
     console.log(chalk.gray('   3. Run "sudo nr flood" again'));
     console.log(chalk.gray('   4. Repeat for WiFi #3, #4, etc.\n'));
-    
+
     console.log(chalk.red('⚠️  To stop ALL attacks:'));
     console.log(chalk.white('   sudo nr stop\n'));
 
@@ -392,11 +421,11 @@ async function cmdStop(): Promise<void> {
   if (hasActiveAttacks()) {
     const attacks = listPersistentAttacks();
     console.log(chalk.yellow(`Found ${attacks.length} persistent flood attack(s)\n`));
-    
+
     for (const attack of attacks) {
       console.log(chalk.gray(`Stopping ${attack.id} (${attack.ssid} - ${attack.gatewayIp})...`));
     }
-    
+
     await stopAllPersistentAttacks();
     stoppedCount += attacks.length;
     console.log(chalk.green(`✓ Stopped ${attacks.length} persistent flood(s)\n`));
@@ -417,10 +446,10 @@ async function cmdStop(): Promise<void> {
 
   // Stop ARP spoof attacks
   const state = loadState();
-  
+
   if (state && state.targets.length > 0) {
     console.log(chalk.yellow(`Found ${state.targets.length} ARP spoof attack(s)\n`));
-    
+
     const iface = await getActiveInterface();
 
     for (const target of state.targets) {
@@ -446,7 +475,7 @@ async function cmdStop(): Promise<void> {
  */
 async function cmdStatus(): Promise<void> {
   console.log(chalk.cyan('\n📊 NetherRipper Status\n'));
-  
+
   let hasAnyAttack = false;
 
   // Show persistent floods
