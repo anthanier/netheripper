@@ -16,7 +16,7 @@ import {
   requireRoot, 
   checkDependencies
 } from './core/exec';
-import { checkFloodTools } from './core/flood'
+import { checkFloodTools } from './core/flood';
 
 /**
  * Show epic banner
